@@ -122,13 +122,14 @@ export const bodySizeLimit = (limit: string = '10mb') => {
       const limitInBytes = parseSize(limit);
       
       if (sizeInBytes > limitInBytes) {
-        return res.status(413).json({
+        res.status(413).json({
           success: false,
           error: {
             code: 'PAYLOAD_TOO_LARGE',
             message: `Request body too large. Maximum size is ${limit}`,
           },
         });
+        return;
       }
     }
     
@@ -161,17 +162,18 @@ export const ipWhitelist = (allowedIPs: string[] = []) => {
       return next(); // No whitelist configured
     }
     
-    const clientIP = req.ip;
+    const clientIP = req.ip || 'unknown';
     
     if (!allowedIPs.includes(clientIP)) {
       logger.warn(`IP not whitelisted: ${clientIP}`);
-      return res.status(403).json({
+      res.status(403).json({
         success: false,
         error: {
           code: 'IP_NOT_ALLOWED',
           message: 'Your IP address is not allowed to access this resource',
         },
       });
+      return;
     }
     
     next();
@@ -183,13 +185,14 @@ export const apiKeyAuth = (req: Request, res: Response, next: NextFunction): voi
   const apiKey = req.headers['x-api-key'] as string;
   
   if (!apiKey) {
-    return res.status(401).json({
+    res.status(401).json({
       success: false,
       error: {
         code: 'API_KEY_MISSING',
         message: 'API key is required',
       },
     });
+    return;
   }
   
   // In a real application, validate against a database or configuration
@@ -197,13 +200,14 @@ export const apiKeyAuth = (req: Request, res: Response, next: NextFunction): voi
   
   if (!validApiKeys.includes(apiKey)) {
     logger.warn(`Invalid API key used: ${apiKey.substring(0, 8)}...`);
-    return res.status(401).json({
+    res.status(401).json({
       success: false,
       error: {
         code: 'INVALID_API_KEY',
         message: 'Invalid API key',
       },
     });
+    return;
   }
   
   next();

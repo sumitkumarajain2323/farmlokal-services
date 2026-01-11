@@ -4,7 +4,8 @@ import { webhookService } from '@/modules/webhooks/webhook-service';
 import { ResponseHelper } from '@/utils/response';
 import { validate } from '@/utils/validation';
 import { asyncHandler } from '@/middlewares/error-handler';
-import { webhookRateLimiter, webhookDeduplication } from '@/middlewares/rate-limiter';
+import { webhookRateLimiter } from '@/middlewares/rate-limiter';
+import { webhookDeduplication } from '@/middlewares/request-deduplication';
 import { logger } from '@/utils/logger';
 
 const router = Router();

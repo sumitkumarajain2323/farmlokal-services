@@ -49,14 +49,16 @@ export class RequestDeduplication {
             
             if (completedRequest && completedRequest.response) {
               logger.info(`Returning cached response for duplicate request: ${deduplicationKey}`);
-              return res.status(completedRequest.response.statusCode)
+              res.status(completedRequest.response.statusCode)
                        .json(completedRequest.response.body);
+              return;
             }
           } else if (existingRequest.status === 'completed' && existingRequest.response) {
             // Request was completed, return cached response
             logger.info(`Returning cached response for duplicate request: ${deduplicationKey}`);
-            return res.status(existingRequest.response.statusCode)
+            res.status(existingRequest.response.statusCode)
                      .json(existingRequest.response.body);
+            return;
           }
         }
 
@@ -85,29 +87,32 @@ export class RequestDeduplication {
 
         // Override end method to cache successful responses
         const originalEnd = res.end;
-        res.end = async function(this: Response, ...args: any[]) {
-          try {
-            // Only cache successful responses (2xx status codes)
-            if (statusCode >= 200 && statusCode < 300 && responseData) {
-              await redisCache.set(cacheKey, {
-                status: 'completed',
-                response: {
-                  statusCode,
-                  body: responseData,
-                },
-                timestamp: Date.now(),
-              }, requestDedup.options.ttlSeconds);
-              
-              logger.debug(`Cached response for request: ${deduplicationKey}`);
-            } else {
-              // Remove processing marker for failed requests
-              await redisCache.del(cacheKey);
+        res.end = function(this: Response, ...args: any[]) {
+          // Use setTimeout to handle async operations without changing return type
+          setTimeout(async () => {
+            try {
+              // Only cache successful responses (2xx status codes)
+              if (statusCode >= 200 && statusCode < 300 && responseData) {
+                await redisCache.set(cacheKey, {
+                  status: 'completed',
+                  response: {
+                    statusCode,
+                    body: responseData,
+                  },
+                  timestamp: Date.now(),
+                }, requestDedup.options.ttlSeconds);
+                
+                logger.debug(`Cached response for request: ${deduplicationKey}`);
+              } else {
+                // Remove processing marker for failed requests
+                await redisCache.del(cacheKey);
+              }
+            } catch (error) {
+              logger.error('Failed to cache response for deduplication:', error);
             }
-          } catch (error) {
-            logger.error('Failed to cache response for deduplication:', error);
-          }
+          }, 0);
           
-          return originalEnd.apply(this, args);
+          return originalEnd.apply(this, args as any);
         };
 
         next();

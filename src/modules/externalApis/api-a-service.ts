@@ -136,7 +136,7 @@ export class ExternalAPIAService {
   ): Promise<AxiosResponse<T>> {
     const accessToken = await oauthService.getAccessToken();
     
-    const config: AxiosRequestConfig = {
+    const requestConfig: AxiosRequestConfig = {
       ...options,
       url: `${this.baseUrl}${endpoint}`,
       headers: {
@@ -148,7 +148,7 @@ export class ExternalAPIAService {
       timeout: config.performance.requestTimeout,
     };
 
-    return await this.executeWithRetry(config);
+    return await this.executeWithRetry(requestConfig);
   }
 
   private async executeWithRetry<T>(
@@ -162,7 +162,7 @@ export class ExternalAPIAService {
       if (axios.isAxiosError(error)) {
         const shouldRetry = this.shouldRetry(error, attempt);
         
-        if (shouldRetry && attempt < config.performance.retryAttempts) {
+        if (shouldRetry && attempt < 3) { // config.performance.retryAttempts
           const delay = this.calculateRetryDelay(attempt);
           logger.warn(`External API A request failed, retrying in ${delay}ms (attempt ${attempt})`);
           
@@ -180,7 +180,7 @@ export class ExternalAPIAService {
   }
 
   private shouldRetry(error: any, attempt: number): boolean {
-    if (attempt >= config.performance.retryAttempts) {
+    if (attempt >= 3) { // config.performance.retryAttempts
       return false;
     }
 

@@ -88,7 +88,7 @@ router.get(
       // Cache metrics for 5 minutes
       await redisCache.set(cacheKey, metrics, CacheTTL.METRICS);
 
-      ResponseHelper.success(res, metrics, 'System metrics retrieved successfully');
+      return ResponseHelper.success(res, metrics, 'System metrics retrieved successfully');
     } catch (error) {
       logger.error('Failed to get system metrics:', error);
       throw error;
@@ -188,7 +188,7 @@ router.get(
       // Cache metrics for 5 minutes
       await redisCache.set(cacheKey, metrics, CacheTTL.METRICS);
 
-      ResponseHelper.success(res, metrics, 'Product metrics retrieved successfully');
+      return ResponseHelper.success(res, metrics, 'Product metrics retrieved successfully');
     } catch (error) {
       logger.error('Failed to get product metrics:', error);
       throw error;
@@ -293,7 +293,7 @@ router.get(
       // Cache metrics for 5 minutes
       await redisCache.set(cacheKey, metrics, CacheTTL.METRICS);
 
-      ResponseHelper.success(res, metrics, 'Webhook metrics retrieved successfully');
+      return ResponseHelper.success(res, metrics, 'Webhook metrics retrieved successfully');
     } catch (error) {
       logger.error('Failed to get webhook metrics:', error);
       throw error;

@@ -20,7 +20,7 @@ export class RateLimiter {
     this.options = {
       windowMs: config.rateLimit.windowMs,
       maxRequests: config.rateLimit.maxRequests,
-      keyGenerator: (req: Request) => req.ip,
+      keyGenerator: (req: Request) => req.ip || 'unknown',
       skipSuccessfulRequests: false,
       skipFailedRequests: false,
       ...options,
@@ -93,7 +93,7 @@ export class RateLimiter {
               });
             }
             
-            return originalEnd.apply(this, args);
+            return originalEnd.apply(this, args as any);
           };
         }
         
@@ -135,7 +135,7 @@ export const webhookRateLimiter = new RateLimiter({
 export const ipRateLimiter = new RateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
   maxRequests: 1000, // High limit for general IP-based limiting
-  keyGenerator: (req: Request) => req.ip,
+  keyGenerator: (req: Request) => req.ip || 'unknown',
 });
 
 // User-based rate limiter (requires authentication)
