@@ -37,7 +37,7 @@ export class OAuthService {
       // Try to get token from cache first
       const cachedToken = await this.getCachedToken();
       if (cachedToken && this.isTokenValid(cachedToken)) {
-        console.log('Using cached OAuth token');
+        console.debug('Using cached OAuth token');
         return cachedToken.access_token;
       }
 
@@ -59,7 +59,7 @@ export class OAuthService {
         // Cache the new token
         await this.cacheToken(newToken);
         
-        console.log('OAuth token refreshed successfully');
+        console.info('OAuth token refreshed successfully');
         return newToken.access_token;
       } finally {
         // Always release the lock
@@ -72,9 +72,7 @@ export class OAuthService {
   }
 
   private async getCachedToken(): Promise<OAuthToken | null> {
-    const cache = await getRedisCache();
-    const tokenStr = await cache.get(CacheKeys.OAUTH_TOKEN);
-    return tokenStr ? JSON.parse(tokenStr) : null;
+    return await cache.get<OAuthToken>(CacheKeys.OAUTH_TOKEN);
   }
 
   private isTokenValid(token: OAuthToken): boolean {
@@ -85,17 +83,11 @@ export class OAuthService {
   }
 
   private async acquireLock(): Promise<boolean> {
-    const cache = await getRedisCache();
     const lockValue = `${Date.now()}-${Math.random()}`;
-    // Note: setNX is not available in our simple cache, so we'll use a simple set
-    const existing = await cache.get(CacheKeys.OAUTH_LOCK);
-    if (existing) return false;
-    await cache.set(CacheKeys.OAUTH_LOCK, lockValue, CacheTTL.OAUTH_LOCK);
-    return true;
+    return await cache.setNX(CacheKeys.OAUTH_LOCK, lockValue, CacheTTL.OAUTH_LOCK);
   }
 
   private async releaseLock(): Promise<void> {
-    const cache = await getRedisCache();
     await cache.del(CacheKeys.OAUTH_LOCK);
   }
 
@@ -104,8 +96,7 @@ export class OAuthService {
     const maxAttempts = 10;
     
     while (attempts < maxAttempts) {
-      const cache = await getRedisCache();
-      const lockExists = await cache.get(CacheKeys.OAUTH_LOCK);
+      const lockExists = await cache.exists(CacheKeys.OAUTH_LOCK);
       if (!lockExists) {
         break;
       }
@@ -159,14 +150,12 @@ export class OAuthService {
   private async cacheToken(token: OAuthToken): Promise<void> {
     // Cache for slightly less than the actual expiry time
     const cacheTTL = Math.max(token.expires_in - 300, 60); // At least 1 minute
-    const cache = await getRedisCache();
-    await cache.set(CacheKeys.OAUTH_TOKEN, JSON.stringify(token), cacheTTL);
+    await cache.set(CacheKeys.OAUTH_TOKEN, token, cacheTTL);
   }
 
   async invalidateToken(): Promise<void> {
-    const cache = await getRedisCache();
     await cache.del(CacheKeys.OAUTH_TOKEN);
-    console.log('OAuth token invalidated');
+    console.info('OAuth token invalidated');
   }
 
   async getTokenInfo(): Promise<{ isValid: boolean; expiresIn?: number }> {

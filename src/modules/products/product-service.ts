@@ -1,9 +1,8 @@
-import { database } from '@/config/database';
-import { redisCache } from '@/cache/redis-client';
-import { CacheKeys, CacheTTL } from '@/cache/cache-keys';
-import { logger } from '@/utils/logger';
-import { NotFoundError, ValidationError } from '@/utils/errors';
-import { encodeCursor, decodeCursor } from '@/utils/validation';
+import { database } from '../../config/database';
+import { getRedisCache } from '../../cache/redis-client';
+import { CacheKeys, CacheTTL } from '../../cache/cache-keys';
+import { NotFoundError, ValidationError } from '../../utils/errors';
+import { encodeCursor, decodeCursor } from '../../utils/validation';
 import { RowDataPacket } from 'mysql2';
 
 export interface Product {
@@ -62,9 +61,11 @@ export class ProductService {
     const cacheKey = CacheKeys.PRODUCTS_LIST(JSON.stringify(params));
     
     // Try cache first
-    const cached = await redisCache.get<ProductListResult>(cacheKey);
+    const cache = await getRedisCache();
+    const cachedStr = await cache.get(cacheKey);
+    const cached = cachedStr ? JSON.parse(cachedStr) : null;
     if (cached) {
-      logger.debug('Returning cached product list');
+      console.log('Returning cached product list');
       return cached;
     }
 
@@ -107,12 +108,12 @@ export class ProductService {
       };
 
       // Cache the result
-      await redisCache.set(cacheKey, result, CacheTTL.PRODUCTS_LIST);
+      await cache.set(cacheKey, JSON.stringify(result), CacheTTL.PRODUCTS_LIST);
 
-      logger.debug(`Retrieved ${products.length} products from database`);
+      console.log(`Retrieved ${products.length} products from database`);
       return result;
     } catch (error) {
-      logger.error('Failed to get products:', error);
+      console.error('Failed to get products:', error);
       throw error;
     }
   }
@@ -121,9 +122,11 @@ export class ProductService {
     const cacheKey = CacheKeys.PRODUCT_DETAIL(id);
     
     // Try cache first
-    const cached = await redisCache.get<Product>(cacheKey);
+    const cache = await getRedisCache();
+    const cachedStr = await cache.get(cacheKey);
+    const cached = cachedStr ? JSON.parse(cachedStr) : null;
     if (cached) {
-      logger.debug(`Returning cached product ${id}`);
+      console.log(`Returning cached product ${id}`);
       return cached;
     }
 
@@ -147,14 +150,14 @@ export class ProductService {
       const product = this.mapRowToProduct(products[0]);
       
       // Cache the result
-      await redisCache.set(cacheKey, product, CacheTTL.PRODUCT_DETAIL);
+      await cache.set(cacheKey, JSON.stringify(product), CacheTTL.PRODUCT_DETAIL);
       
       return product;
     } catch (error) {
       if (error instanceof NotFoundError) {
         throw error;
       }
-      logger.error(`Failed to get product ${id}:`, error);
+      console.error(`Failed to get product ${id}:`, error);
       throw error;
     }
   }
@@ -171,9 +174,11 @@ export class ProductService {
     const cacheKey = CacheKeys.PRODUCTS_SEARCH(`${searchTerm}:${limit}:${offset}`);
     
     // Try cache first
-    const cached = await redisCache.get<{ products: Product[]; total: number }>(cacheKey);
+    const cache = await getRedisCache();
+    const cachedStr = await cache.get(cacheKey);
+    const cached = cachedStr ? JSON.parse(cachedStr) : null;
     if (cached) {
-      logger.debug('Returning cached search results');
+      console.log('Returning cached search results');
       return cached;
     }
 
@@ -214,12 +219,12 @@ export class ProductService {
       const result = { products, total };
       
       // Cache the result
-      await redisCache.set(cacheKey, result, CacheTTL.PRODUCTS_SEARCH);
+      await cache.set(cacheKey, JSON.stringify(result), CacheTTL.PRODUCTS_SEARCH);
       
-      logger.debug(`Search for "${searchTerm}" returned ${products.length} products`);
+      console.log(`Search for "${searchTerm}" returned ${products.length} products`);
       return result;
     } catch (error) {
-      logger.error(`Failed to search products for "${searchTerm}":`, error);
+      console.error(`Failed to search products for "${searchTerm}":`, error);
       throw error;
     }
   }
@@ -228,7 +233,9 @@ export class ProductService {
     const cacheKey = CacheKeys.PRODUCTS_COUNT;
     
     // Try cache first
-    const cached = await redisCache.get<number>(cacheKey);
+    const cache = await getRedisCache();
+    const cachedStr = await cache.get(cacheKey);
+    const cached = cachedStr ? parseInt(cachedStr) : null;
     if (cached !== null) {
       return cached;
     }
@@ -240,11 +247,11 @@ export class ProductService {
       const count = (rows as RowDataPacket[])[0]?.total || 0;
       
       // Cache the result
-      await redisCache.set(cacheKey, count, CacheTTL.PRODUCTS_COUNT);
+      await cache.set(cacheKey, count.toString(), CacheTTL.PRODUCTS_COUNT);
       
       return count;
     } catch (error) {
-      logger.error('Failed to get product count:', error);
+      console.error('Failed to get product count:', error);
       throw error;
     }
   }
@@ -365,16 +372,16 @@ export class ProductService {
   }
 
   async invalidateProductCaches(productId?: number): Promise<void> {
+    const cache = await getRedisCache();
     if (productId) {
-      await redisCache.del(CacheKeys.PRODUCT_DETAIL(productId));
+      await cache.del(CacheKeys.PRODUCT_DETAIL(productId));
     }
     
-    // Invalidate list and search caches
-    await redisCache.flushPattern('products:list:*');
-    await redisCache.flushPattern('products:search:*');
-    await redisCache.del(CacheKeys.PRODUCTS_COUNT);
+    // Note: flushPattern is not available in our simple cache, so we skip pattern-based invalidation
+    // In production, you might want to implement pattern-based cache invalidation
+    await cache.del(CacheKeys.PRODUCTS_COUNT);
     
-    logger.info(`Invalidated product caches${productId ? ` for product ${productId}` : ''}`);
+    console.log(`Invalidated product caches${productId ? ` for product ${productId}` : ''}`);
   }
 }
 

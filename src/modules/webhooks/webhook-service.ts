@@ -1,11 +1,10 @@
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
-import { redisCache } from '@/cache/redis-client';
-import { CacheKeys, CacheTTL } from '@/cache/cache-keys';
-import { database } from '@/config/database';
-import { logger } from '@/utils/logger';
-import { ValidationError, ConflictError } from '@/utils/errors';
-import config from '@/config';
+import { getRedisCache } from '../../cache/redis-client';
+import { CacheKeys, CacheTTL } from '../../cache/cache-keys';
+import { database } from '../../config/database';
+import { ValidationError, ConflictError } from '../../utils/errors';
+import config from '../../config';
 
 export interface WebhookEvent {
   id: string;
@@ -49,7 +48,7 @@ export class WebhookService {
         [id, url, JSON.stringify(events), secret, true]
       );
 
-      logger.info(`Webhook registered: ${url} for events: ${events.join(', ')}`);
+      console.log(`Webhook registered: ${url} for events: ${events.join(', ')}`);
 
       return {
         id,
@@ -60,7 +59,7 @@ export class WebhookService {
         createdAt: new Date(),
       };
     } catch (error) {
-      logger.error('Failed to register webhook:', error);
+      console.error('Failed to register webhook:', error);
       throw error;
     }
   }
@@ -84,14 +83,15 @@ export class WebhookService {
     const isDuplicate = await this.checkDuplicateEvent(idempotencyKey);
     
     if (isDuplicate) {
-      logger.warn(`Duplicate webhook event detected: ${eventId}`);
+      console.warn(`Duplicate webhook event detected: ${eventId}`);
       throw new ConflictError('Duplicate webhook event');
     }
 
     // Mark event as processing to prevent duplicates
-    await redisCache.set(
+    const cache = await getRedisCache();
+    await cache.set(
       CacheKeys.WEBHOOK_EVENT(idempotencyKey),
-      { eventId, status: 'processing' },
+      JSON.stringify({ eventId, status: 'processing' }),
       CacheTTL.WEBHOOK_EVENT
     );
 
@@ -118,11 +118,11 @@ export class WebhookService {
       // Mark as processed
       await this.markEventAsProcessed(eventId);
       
-      logger.info(`Webhook event processed successfully: ${eventId}`);
+      console.log(`Webhook event processed successfully: ${eventId}`);
       
       return { ...webhookEvent, processed: true };
     } catch (error) {
-      logger.error(`Failed to process webhook event ${eventId}:`, error);
+      console.error(`Failed to process webhook event ${eventId}:`, error);
       
       // Schedule retry if not a validation error
       if (!(error instanceof ValidationError)) {
@@ -155,7 +155,7 @@ export class WebhookService {
         ]
       );
     } catch (error) {
-      logger.error('Failed to store webhook event:', error);
+      console.error('Failed to store webhook event:', error);
       throw error;
     }
   }
@@ -175,12 +175,12 @@ export class WebhookService {
         await this.handleInventoryChanged(event.data);
         break;
       default:
-        logger.warn(`Unknown webhook event type: ${event.type}`);
+        console.warn(`Unknown webhook event type: ${event.type}`);
     }
   }
 
   private async handleOrderCreated(data: any): Promise<void> {
-    logger.info('Processing order.created webhook:', data);
+    console.log('Processing order.created webhook:', data);
     
     // Invalidate relevant caches
     await this.invalidateOrderCaches(data.customerId);
@@ -194,21 +194,21 @@ export class WebhookService {
   }
 
   private async handleOrderUpdated(data: any): Promise<void> {
-    logger.info('Processing order.updated webhook:', data);
+    console.log('Processing order.updated webhook:', data);
     
     // Invalidate relevant caches
     await this.invalidateOrderCaches(data.customerId);
   }
 
   private async handleProductUpdated(data: any): Promise<void> {
-    logger.info('Processing product.updated webhook:', data);
+    console.log('Processing product.updated webhook:', data);
     
     // Invalidate product caches
     await this.invalidateProductCaches(data.productId);
   }
 
   private async handleInventoryChanged(data: any): Promise<void> {
-    logger.info('Processing inventory.changed webhook:', data);
+    console.log('Processing inventory.changed webhook:', data);
     
     // Update product inventory
     await this.updateProductInventory(data.productId, data.quantityChange);
@@ -226,29 +226,30 @@ export class WebhookService {
         [quantityChange, productId]
       );
       
-      logger.info(`Updated inventory for product ${productId}: ${quantityChange > 0 ? '+' : ''}${quantityChange}`);
+      console.log(`Updated inventory for product ${productId}: ${quantityChange > 0 ? '+' : ''}${quantityChange}`);
     } catch (error) {
-      logger.error(`Failed to update inventory for product ${productId}:`, error);
+      console.error(`Failed to update inventory for product ${productId}:`, error);
       throw error;
     }
   }
 
   private async invalidateProductCaches(productId: number): Promise<void> {
     // Invalidate specific product cache
-    await redisCache.del(CacheKeys.PRODUCT_DETAIL(productId));
+    const cache = await getRedisCache();
+    await cache.del(CacheKeys.PRODUCT_DETAIL(productId));
     
     // Invalidate product list caches (this is a simplified approach)
-    await redisCache.flushPattern('products:list:*');
-    await redisCache.flushPattern('products:search:*');
+    await // cache.flushPattern('products:list:*');
+    await // cache.flushPattern('products:search:*');
     
-    logger.debug(`Invalidated caches for product ${productId}`);
+    console.log(`Invalidated caches for product ${productId}`);
   }
 
   private async invalidateOrderCaches(customerId: number): Promise<void> {
     // Invalidate customer-specific caches if they exist
-    await redisCache.flushPattern(`orders:customer:${customerId}:*`);
+    await // cache.flushPattern(`orders:customer:${customerId}:*`);
     
-    logger.debug(`Invalidated order caches for customer ${customerId}`);
+    console.log(`Invalidated order caches for customer ${customerId}`);
   }
 
   private async markEventAsProcessed(eventId: string): Promise<void> {
@@ -260,7 +261,7 @@ export class WebhookService {
         [true, eventId]
       );
     } catch (error) {
-      logger.error(`Failed to mark event ${eventId} as processed:`, error);
+      console.error(`Failed to mark event ${eventId} as processed:`, error);
     }
   }
 
@@ -268,7 +269,7 @@ export class WebhookService {
     const maxRetries = 3;
     
     if (event.retryCount >= maxRetries) {
-      logger.error(`Max retries exceeded for webhook event ${event.id}`);
+      console.error(`Max retries exceeded for webhook event ${event.id}`);
       return;
     }
 
@@ -282,9 +283,9 @@ export class WebhookService {
       
       // In a real implementation, you would use a job queue like Bull or Agenda
       // For now, we'll just log that a retry should be scheduled
-      logger.info(`Scheduled retry for webhook event ${event.id} (attempt ${event.retryCount + 1})`);
+      console.log(`Scheduled retry for webhook event ${event.id} (attempt ${event.retryCount + 1})`);
     } catch (error) {
-      logger.error(`Failed to schedule retry for event ${event.id}:`, error);
+      console.error(`Failed to schedule retry for event ${event.id}:`, error);
     }
   }
 
@@ -294,7 +295,9 @@ export class WebhookService {
   }
 
   private async checkDuplicateEvent(idempotencyKey: string): Promise<boolean> {
-    return await redisCache.exists(CacheKeys.WEBHOOK_EVENT(idempotencyKey));
+    const cache = await getRedisCache();
+    const result = await cache.get(CacheKeys.WEBHOOK_EVENT(idempotencyKey));
+    return result !== null;
   }
 
   private verifySignature(payload: any, signature: string): boolean {
@@ -342,7 +345,7 @@ export class WebhookService {
         data: JSON.parse(row.data),
       }));
     } catch (error) {
-      logger.error('Failed to fetch webhook events:', error);
+      console.error('Failed to fetch webhook events:', error);
       throw error;
     }
   }

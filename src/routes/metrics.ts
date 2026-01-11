@@ -1,13 +1,12 @@
 import { Router } from 'express';
 import { query } from 'express-validator';
-import { database } from '@/config/database';
-import { redisCache } from '@/cache/redis-client';
-import { CacheKeys, CacheTTL } from '@/cache/cache-keys';
-import { ResponseHelper } from '@/utils/response';
-import { validate } from '@/utils/validation';
-import { asyncHandler } from '@/middlewares/error-handler';
-import { strictRateLimiter } from '@/middlewares/rate-limiter';
-import { logger } from '@/utils/logger';
+import { database } from '../config/database';
+import { getRedisCache } from '../cache/redis-client';
+import { CacheKeys, CacheTTL } from '../cache/cache-keys';
+import { ResponseHelper } from '../utils/response';
+import { validate } from '../utils/validation';
+import { asyncHandler } from '../middlewares/error-handler';
+import { strictRateLimiter } from '../middlewares/rate-limiter';
 import { RowDataPacket } from 'mysql2';
 
 const router = Router();
@@ -22,9 +21,10 @@ router.get(
     const cacheKey = CacheKeys.METRICS('system', 'current');
     
     // Try cache first
-    const cached = await redisCache.get<any>(cacheKey);
+    const cache = await getRedisCache();
+    const cached = await cache.get(cacheKey);
     if (cached) {
-      return ResponseHelper.success(res, cached, 'System metrics retrieved from cache');
+      return ResponseHelper.success(res, JSON.parse(cached), 'System metrics retrieved from cache');
     }
 
     const db = database.getPool();
@@ -43,7 +43,6 @@ router.get(
       const dbMetrics = (dbStats as RowDataPacket[])[0];
 
       // Get Redis metrics
-      const redisClient = redisCache;
       const redisInfo = {
         connected: true, // If we got here, Redis is connected
         // Add more Redis metrics as needed
@@ -86,11 +85,11 @@ router.get(
       };
 
       // Cache metrics for 5 minutes
-      await redisCache.set(cacheKey, metrics, CacheTTL.METRICS);
+      await cache.set(cacheKey, JSON.stringify(metrics), CacheTTL.METRICS);
 
       return ResponseHelper.success(res, metrics, 'System metrics retrieved successfully');
     } catch (error) {
-      logger.error('Failed to get system metrics:', error);
+      console.error('Failed to get system metrics:', error);
       throw error;
     }
   })
@@ -110,9 +109,10 @@ router.get(
     const cacheKey = CacheKeys.METRICS('products', period);
     
     // Try cache first
-    const cached = await redisCache.get<any>(cacheKey);
+    const cache = await getRedisCache();
+    const cached = await cache.get(cacheKey);
     if (cached) {
-      return ResponseHelper.success(res, cached, 'Product metrics retrieved from cache');
+      return ResponseHelper.success(res, JSON.parse(cached), 'Product metrics retrieved from cache');
     }
 
     const db = database.getPool();
@@ -186,11 +186,11 @@ router.get(
       };
 
       // Cache metrics for 5 minutes
-      await redisCache.set(cacheKey, metrics, CacheTTL.METRICS);
+      await cache.set(cacheKey, JSON.stringify(metrics), CacheTTL.METRICS);
 
       return ResponseHelper.success(res, metrics, 'Product metrics retrieved successfully');
     } catch (error) {
-      logger.error('Failed to get product metrics:', error);
+      console.error('Failed to get product metrics:', error);
       throw error;
     }
   })
@@ -210,9 +210,10 @@ router.get(
     const cacheKey = CacheKeys.METRICS('webhooks', period);
     
     // Try cache first
-    const cached = await redisCache.get<any>(cacheKey);
+    const cache = await getRedisCache();
+    const cached = await cache.get(cacheKey);
     if (cached) {
-      return ResponseHelper.success(res, cached, 'Webhook metrics retrieved from cache');
+      return ResponseHelper.success(res, JSON.parse(cached), 'Webhook metrics retrieved from cache');
     }
 
     const db = database.getPool();
@@ -291,11 +292,11 @@ router.get(
       };
 
       // Cache metrics for 5 minutes
-      await redisCache.set(cacheKey, metrics, CacheTTL.METRICS);
+      await cache.set(cacheKey, JSON.stringify(metrics), CacheTTL.METRICS);
 
       return ResponseHelper.success(res, metrics, 'Webhook metrics retrieved successfully');
     } catch (error) {
-      logger.error('Failed to get webhook metrics:', error);
+      console.error('Failed to get webhook metrics:', error);
       throw error;
     }
   })
@@ -327,8 +328,9 @@ router.get(
 
     try {
       // Check Redis connection
-      await redisCache.set('health_check', 'ok', 10);
-      await redisCache.get('health_check');
+      const cache = await getRedisCache();
+      await cache.set('health_check', 'ok', 10);
+      await cache.get('health_check');
       health.services.redis = 'healthy';
     } catch (error) {
       health.services.redis = 'unhealthy';

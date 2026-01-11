@@ -1,7 +1,6 @@
 import axios, { AxiosResponse, AxiosRequestConfig } from 'axios';
-import { redisCache } from '@/cache/redis-client';
-import { CacheKeys, CacheTTL } from '@/cache/cache-keys';
-import { logger } from '@/utils/logger';
+import { getRedisCache } from '../../cache/redis-client';
+import { CacheKeys, CacheTTL } from '../../cache/cache-keys';
 import { ExternalAPIError, CircuitBreakerError } from '@/utils/errors';
 import { oauthService } from '@/modules/auth/oauth-service';
 import config from '@/config';
@@ -54,9 +53,11 @@ export class ExternalAPIAService {
     const cacheKey = CacheKeys.EXTERNAL_API_A('products', JSON.stringify(params));
     
     // Try cache first
-    const cached = await redisCache.get<ProductData[]>(cacheKey);
+    const cache = await getRedisCache();
+    const cachedStr = await cache.get(cacheKey);
+    const cached = cachedStr ? JSON.parse(cachedStr) : null;
     if (cached) {
-      logger.debug('Returning cached external API A products');
+      console.log('Returning cached external API A products');
       return cached;
     }
 
@@ -69,7 +70,7 @@ export class ExternalAPIAService {
       });
 
       // Cache the response
-      await redisCache.set(cacheKey, response.data, CacheTTL.EXTERNAL_API_A);
+      await cache.set(cacheKey, JSON.stringify(response.data), CacheTTL.EXTERNAL_API_A);
       
       // Reset circuit breaker on success
       await this.resetCircuitBreaker();
@@ -85,9 +86,11 @@ export class ExternalAPIAService {
     const cacheKey = CacheKeys.EXTERNAL_API_A('product', productId.toString());
     
     // Try cache first
-    const cached = await redisCache.get<ProductData>(cacheKey);
+    const cache = await getRedisCache();
+    const cachedStr = await cache.get(cacheKey);
+    const cached = cachedStr ? JSON.parse(cachedStr) : null;
     if (cached) {
-      logger.debug(`Returning cached external API A product ${productId}`);
+      console.log(`Returning cached external API A product ${productId}`);
       return cached;
     }
 
@@ -98,7 +101,7 @@ export class ExternalAPIAService {
       const response = await this.makeRequest<ProductData>(`/api/products/${productId}`);
       
       // Cache the response
-      await redisCache.set(cacheKey, response.data, CacheTTL.EXTERNAL_API_A);
+      await cache.set(cacheKey, JSON.stringify(response.data), CacheTTL.EXTERNAL_API_A);
       
       // Reset circuit breaker on success
       await this.resetCircuitBreaker();
@@ -164,7 +167,7 @@ export class ExternalAPIAService {
         
         if (shouldRetry && attempt < 3) { // config.performance.retryAttempts
           const delay = this.calculateRetryDelay(attempt);
-          logger.warn(`External API A request failed, retrying in ${delay}ms (attempt ${attempt})`);
+          console.warn(`External API A request failed, retrying in ${delay}ms (attempt ${attempt})`);
           
           await new Promise(resolve => setTimeout(resolve, delay));
           return this.executeWithRetry(config, attempt + 1);
@@ -234,7 +237,7 @@ export class ExternalAPIAService {
     await this.setCircuitBreakerState(newState);
     
     if (newState.state === 'open') {
-      logger.warn(`Circuit breaker opened for ${this.serviceName} after ${newFailures} failures`);
+      console.warn(`Circuit breaker opened for ${this.serviceName} after ${newFailures} failures`);
     }
   }
 
@@ -247,9 +250,11 @@ export class ExternalAPIAService {
   }
 
   private async getCircuitBreakerState(): Promise<CircuitBreakerState> {
-    const cached = await redisCache.get<CircuitBreakerState>(
+    const cache = await getRedisCache();
+    const cachedStr = await cache.get(
       CacheKeys.CIRCUIT_BREAKER(this.serviceName)
     );
+    const cached = cachedStr ? JSON.parse(cachedStr) : null;
     
     return cached || {
       failures: 0,
@@ -259,9 +264,10 @@ export class ExternalAPIAService {
   }
 
   private async setCircuitBreakerState(state: CircuitBreakerState): Promise<void> {
-    await redisCache.set(
+    const cache = await getRedisCache();
+    await cache.set(
       CacheKeys.CIRCUIT_BREAKER(this.serviceName),
-      state,
+      JSON.stringify(state),
       CacheTTL.CIRCUIT_BREAKER
     );
   }

@@ -1,77 +1,89 @@
 import { createClient, RedisClientType } from 'redis';
-import { logger } from '@/utils/logger';
 
 export interface RedisConfig {
   host: string;
   port: number;
   password?: string;
   db: number;
-  retryDelayOnFailover: number;
-  maxRetriesPerRequest: number;
-  lazyConnect: boolean;
 }
 
 export const redisConfig: RedisConfig = {
   host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379'),
+  port: Number(process.env.REDIS_PORT || 6379),
   password: process.env.REDIS_PASSWORD || undefined,
-  db: parseInt(process.env.REDIS_DB || '0'),
-  retryDelayOnFailover: 100,
-  maxRetriesPerRequest: 3,
-  lazyConnect: true,
+  db: Number(process.env.REDIS_DB || 0),
 };
 
 class RedisConnection {
   private client: RedisClientType | null = null;
+  private connecting = false;
+  private connectionPromise: Promise<RedisClientType> | null = null;
 
-  async initialize(): Promise<void> {
+  private async connect(): Promise<RedisClientType> {
+    if (this.client) return this.client;
+    if (this.connectionPromise) return this.connectionPromise;
+
+    this.connectionPromise = this.doConnect();
+    return this.connectionPromise;
+  }
+
+  private async doConnect(): Promise<RedisClientType> {
     try {
+      this.connecting = true;
+
       this.client = createClient({
         socket: {
           host: redisConfig.host,
           port: redisConfig.port,
-          reconnectStrategy: (retries) => Math.min(retries * 50, 500),
+          reconnectStrategy: retries => Math.min(retries * 50, 1000),
         },
         password: redisConfig.password,
         database: redisConfig.db,
       });
 
-      this.client.on('error', (err) => {
-        logger.error('Redis Client Error:', err);
+      this.client.on('error', err => {
+        console.warn('Redis error (continuing without Redis):', err.message);
       });
 
       this.client.on('connect', () => {
-        logger.info('Redis client connected');
+        console.log('Redis connected successfully');
       });
 
-      this.client.on('ready', () => {
-        logger.info('Redis client ready');
-      });
-
-      this.client.on('end', () => {
-        logger.info('Redis client disconnected');
+      this.client.on('disconnect', () => {
+        console.warn('Redis disconnected');
+        this.client = null;
+        this.connectionPromise = null;
       });
 
       await this.client.connect();
-      logger.info('Redis connection initialized successfully');
-    } catch (error) {
-      logger.error('Failed to initialize Redis connection:', error);
-      throw error;
+      return this.client;
+    } catch (err) {
+      this.client = null;
+      this.connectionPromise = null;
+      throw err;
+    } finally {
+      this.connecting = false;
     }
   }
 
-  getClient(): RedisClientType {
-    if (!this.client) {
-      throw new Error('Redis client not initialized. Call initialize() first.');
+  async getClient(): Promise<RedisClientType | null> {
+    try {
+      return await this.connect();
+    } catch (err) {
+      console.warn('Redis unavailable, continuing without cache:', err instanceof Error ? err.message : err);
+      return null;
     }
-    return this.client;
   }
 
   async close(): Promise<void> {
     if (this.client) {
-      await this.client.quit();
+      try {
+        await this.client.quit();
+      } catch (err) {
+        console.warn('Error closing Redis connection:', err);
+      }
       this.client = null;
-      logger.info('Redis connection closed');
+      this.connectionPromise = null;
     }
   }
 }

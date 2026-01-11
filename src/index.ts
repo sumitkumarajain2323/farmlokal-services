@@ -2,10 +2,9 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
-import { database } from '@/config/database';
-import { redis } from '@/config/redis';
-import { logger } from '@/utils/logger';
-import { errorHandler, notFoundHandler } from '@/middlewares/error-handler';
+import { database } from './config/database';
+import { redis } from './config/redis';
+import { errorHandler, notFoundHandler } from './middlewares/error-handler';
 import { 
   corsOptions, 
   helmetOptions, 
@@ -13,10 +12,10 @@ import {
   requestLogger,
   requestId,
   securityHeaders 
-} from '@/middlewares/security';
-import { generalRateLimiter } from '@/middlewares/rate-limiter';
-import routes from '@/routes';
-import config from '@/config';
+} from './middlewares/security';
+import { generalRateLimiter } from './middlewares/rate-limiter';
+import routes from './routes';
+import config from './config';
 
 class FarmLokalServer {
   private app: express.Application;
@@ -93,19 +92,18 @@ class FarmLokalServer {
 
   async initialize(): Promise<void> {
     try {
-      logger.info('Initializing FarmLokal Backend...');
+      console.log('Initializing FarmLokal Backend...');
       
       // Initialize database connection
       await database.initialize();
-      logger.info('Database connection established');
+      console.log('Database connection established');
       
-      // Initialize Redis connection
-      await redis.initialize();
-      logger.info('Redis connection established');
+      // Initialize Redis connection (non-blocking)
+      redis.getClient().catch(() => console.warn('Redis unavailable, continuing without cache'));
       
-      logger.info('FarmLokal Backend initialized successfully');
+      console.log('FarmLokal Backend initialized successfully');
     } catch (error) {
-      logger.error('Failed to initialize FarmLokal Backend:', error);
+      console.error('Failed to initialize FarmLokal Backend:', error);
       throw error;
     }
   }
@@ -115,37 +113,37 @@ class FarmLokalServer {
       await this.initialize();
       
       this.server = this.app.listen(config.PORT, () => {
-        logger.info(`🚀 FarmLokal Backend started successfully!`);
-        logger.info(`📍 Server running on port ${config.PORT}`);
-        logger.info(`🌍 Environment: ${config.NODE_ENV}`);
-        logger.info(`📊 API Version: ${config.API_VERSION}`);
-        logger.info(`🔗 Health Check: http://localhost:${config.PORT}/health`);
-        logger.info(`📚 API Docs: http://localhost:${config.PORT}/api/${config.API_VERSION}`);
+        console.log(`🚀 FarmLokal Backend started successfully!`);
+        console.log(`📍 Server running on port ${config.PORT}`);
+        console.log(`🌍 Environment: ${config.NODE_ENV}`);
+        console.log(`📊 API Version: ${config.API_VERSION}`);
+        console.log(`🔗 Health Check: http://localhost:${config.PORT}/health`);
+        console.log(`📚 API Docs: http://localhost:${config.PORT}/api/${config.API_VERSION}`);
       });
 
       // Handle server errors
       this.server.on('error', (error: any) => {
         if (error.code === 'EADDRINUSE') {
-          logger.error(`Port ${config.PORT} is already in use`);
+          console.error(`Port ${config.PORT} is already in use`);
         } else {
-          logger.error('Server error:', error);
+          console.error('Server error:', error);
         }
         process.exit(1);
       });
 
     } catch (error) {
-      logger.error('Failed to start server:', error);
+      console.error('Failed to start server:', error);
       process.exit(1);
     }
   }
 
   async stop(): Promise<void> {
-    logger.info('Shutting down FarmLokal Backend...');
+    console.log('Shutting down FarmLokal Backend...');
     
     if (this.server) {
       await new Promise<void>((resolve) => {
         this.server.close(() => {
-          logger.info('HTTP server closed');
+          console.log('HTTP server closed');
           resolve();
         });
       });
@@ -155,7 +153,7 @@ class FarmLokalServer {
     await database.close();
     await redis.close();
     
-    logger.info('FarmLokal Backend shut down complete');
+    console.log('FarmLokal Backend shut down complete');
   }
 }
 
@@ -164,32 +162,32 @@ const server = new FarmLokalServer();
 
 // Graceful shutdown handling
 process.on('SIGTERM', async () => {
-  logger.info('SIGTERM received, shutting down gracefully');
+  console.log('SIGTERM received, shutting down gracefully');
   await server.stop();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-  logger.info('SIGINT received, shutting down gracefully');
+  console.log('SIGINT received, shutting down gracefully');
   await server.stop();
   process.exit(0);
 });
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
-  logger.error('Uncaught Exception:', error);
+  console.error('Uncaught Exception:', error);
   process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
   process.exit(1);
 });
 
 // Start the server
 if (require.main === module) {
   server.start().catch((error) => {
-    logger.error('Failed to start FarmLokal Backend:', error);
+    console.error('Failed to start FarmLokal Backend:', error);
     process.exit(1);
   });
 }

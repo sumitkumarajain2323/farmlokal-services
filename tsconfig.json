@@ -23,14 +23,7 @@
     "moduleResolution": "node",
     "baseUrl": "./src",
     "paths": {
-      "@/*": ["*"],
-      "@/config/*": ["config/*"],
-      "@/modules/*": ["modules/*"],
-      "@/database/*": ["database/*"],
-      "@/cache/*": ["cache/*"],
-      "@/middlewares/*": ["middlewares/*"],
-      "@/routes/*": ["routes/*"],
-      "@/utils/*": ["utils/*"]
+      "@/*": ["*"]
     }
   },
   "include": ["src/**/*"],

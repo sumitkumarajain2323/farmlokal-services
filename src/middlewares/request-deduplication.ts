@@ -1,8 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
-import { redisCache } from '@/cache/redis-client';
-import { CacheKeys, CacheTTL } from '@/cache/cache-keys';
-import { logger } from '@/utils/logger';
+import { getRedisCache } from '../cache/redis-client';
+import { CacheKeys, CacheTTL } from '../cache/cache-keys';
 
 export interface DeduplicationOptions {
   ttlSeconds?: number;
@@ -35,27 +34,26 @@ export class RequestDeduplication {
         const cacheKey = CacheKeys.REQUEST_DEDUP(deduplicationKey);
 
         // Check if request is already being processed
-        const existingRequest = await redisCache.get<{
-          status: 'processing' | 'completed';
-          response?: any;
-          timestamp: number;
-        }>(cacheKey);
+        const cache = await getRedisCache();
+        const existingRequestStr = await cache.get(cacheKey);
+        const existingRequest = existingRequestStr ? JSON.parse(existingRequestStr) : null;
 
         if (existingRequest) {
           if (existingRequest.status === 'processing') {
             // Request is currently being processed, wait and retry
             await this.waitForCompletion(cacheKey);
-            const completedRequest = await redisCache.get<any>(cacheKey);
+            const completedRequestStr = await cache.get(cacheKey);
+            const completedRequest = completedRequestStr ? JSON.parse(completedRequestStr) : null;
             
             if (completedRequest && completedRequest.response) {
-              logger.info(`Returning cached response for duplicate request: ${deduplicationKey}`);
+              console.log(`Returning cached response for duplicate request: ${deduplicationKey}`);
               res.status(completedRequest.response.statusCode)
                        .json(completedRequest.response.body);
               return;
             }
           } else if (existingRequest.status === 'completed' && existingRequest.response) {
             // Request was completed, return cached response
-            logger.info(`Returning cached response for duplicate request: ${deduplicationKey}`);
+            console.log(`Returning cached response for duplicate request: ${deduplicationKey}`);
             res.status(existingRequest.response.statusCode)
                      .json(existingRequest.response.body);
             return;
@@ -63,10 +61,10 @@ export class RequestDeduplication {
         }
 
         // Mark request as processing
-        await redisCache.set(cacheKey, {
+        await cache.set(cacheKey, JSON.stringify({
           status: 'processing',
           timestamp: Date.now(),
-        }, this.options.ttlSeconds);
+        }), this.options.ttlSeconds);
 
         // Store original response methods
         const originalJson = res.json;
@@ -93,22 +91,24 @@ export class RequestDeduplication {
             try {
               // Only cache successful responses (2xx status codes)
               if (statusCode >= 200 && statusCode < 300 && responseData) {
-                await redisCache.set(cacheKey, {
+                const cache = await getRedisCache();
+                await cache.set(cacheKey, JSON.stringify({
                   status: 'completed',
                   response: {
                     statusCode,
                     body: responseData,
                   },
                   timestamp: Date.now(),
-                }, requestDedup.options.ttlSeconds);
+                }), requestDedup.options.ttlSeconds);
                 
-                logger.debug(`Cached response for request: ${deduplicationKey}`);
+                console.log(`Cached response for request: ${deduplicationKey}`);
               } else {
                 // Remove processing marker for failed requests
-                await redisCache.del(cacheKey);
+                const cache = await getRedisCache();
+                await cache.del(cacheKey);
               }
             } catch (error) {
-              logger.error('Failed to cache response for deduplication:', error);
+              console.error('Failed to cache response for deduplication:', error);
             }
           }, 0);
           
@@ -117,7 +117,7 @@ export class RequestDeduplication {
 
         next();
       } catch (error) {
-        logger.error('Request deduplication error:', error);
+        console.error('Request deduplication error:', error);
         next(); // Continue without deduplication on error
       }
     };
@@ -156,7 +156,9 @@ export class RequestDeduplication {
     const checkInterval = 100; // Check every 100ms
 
     while (Date.now() - startTime < maxWaitMs) {
-      const request = await redisCache.get<any>(cacheKey);
+      const cache = await getRedisCache();
+      const requestStr = await cache.get(cacheKey);
+      const request = requestStr ? JSON.parse(requestStr) : null;
       
       if (!request || request.status === 'completed') {
         return;
@@ -165,7 +167,7 @@ export class RequestDeduplication {
       await new Promise(resolve => setTimeout(resolve, checkInterval));
     }
 
-    logger.warn(`Timeout waiting for request completion: ${cacheKey}`);
+    console.warn(`Timeout waiting for request completion: ${cacheKey}`);
   }
 }
 
