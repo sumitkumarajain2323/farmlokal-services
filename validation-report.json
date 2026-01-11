@@ -1,0 +1,303 @@
+{
+  "timestamp": "2026-01-11T09:59:27.700Z",
+  "results": {
+    "structure": [],
+    "files": [
+      {
+        "test": "Directory src exists",
+        "path": "src",
+        "passed": true
+      },
+      {
+        "test": "Directory src/config exists",
+        "path": "src/config",
+        "passed": true
+      },
+      {
+        "test": "Directory src/modules exists",
+        "path": "src/modules",
+        "passed": true
+      },
+      {
+        "test": "Directory src/modules/auth exists",
+        "path": "src/modules/auth",
+        "passed": true
+      },
+      {
+        "test": "Directory src/modules/products exists",
+        "path": "src/modules/products",
+        "passed": true
+      },
+      {
+        "test": "Directory src/modules/webhooks exists",
+        "path": "src/modules/webhooks",
+        "passed": true
+      },
+      {
+        "test": "Directory src/modules/externalApis exists",
+        "path": "src/modules/externalApis",
+        "passed": true
+      },
+      {
+        "test": "Directory src/database exists",
+        "path": "src/database",
+        "passed": true
+      },
+      {
+        "test": "Directory src/cache exists",
+        "path": "src/cache",
+        "passed": true
+      },
+      {
+        "test": "Directory src/middlewares exists",
+        "path": "src/middlewares",
+        "passed": true
+      },
+      {
+        "test": "Directory src/routes exists",
+        "path": "src/routes",
+        "passed": true
+      },
+      {
+        "test": "Directory src/utils exists",
+        "path": "src/utils",
+        "passed": true
+      },
+      {
+        "test": "Core file package.json exists",
+        "path": "package.json",
+        "passed": true
+      },
+      {
+        "test": "Core file tsconfig.json exists",
+        "path": "tsconfig.json",
+        "passed": true
+      },
+      {
+        "test": "Core file .env.example exists",
+        "path": ".env.example",
+        "passed": true
+      },
+      {
+        "test": "Core file src/index.ts exists",
+        "path": "src/index.ts",
+        "passed": true
+      },
+      {
+        "test": "Core file src/config/index.ts exists",
+        "path": "src/config/index.ts",
+        "passed": true
+      },
+      {
+        "test": "Core file src/config/database.ts exists",
+        "path": "src/config/database.ts",
+        "passed": true
+      },
+      {
+        "test": "Core file src/config/redis.ts exists",
+        "path": "src/config/redis.ts",
+        "passed": true
+      },
+      {
+        "test": "Core file src/utils/logger.ts exists",
+        "path": "src/utils/logger.ts",
+        "passed": true
+      },
+      {
+        "test": "Core file src/utils/errors.ts exists",
+        "path": "src/utils/errors.ts",
+        "passed": true
+      },
+      {
+        "test": "Core file src/utils/response.ts exists",
+        "path": "src/utils/response.ts",
+        "passed": true
+      },
+      {
+        "test": "Core file src/database/schema.sql exists",
+        "path": "src/database/schema.sql",
+        "passed": true
+      },
+      {
+        "test": "Core file src/database/migrate.ts exists",
+        "path": "src/database/migrate.ts",
+        "passed": true
+      },
+      {
+        "test": "Core file src/database/seed.ts exists",
+        "path": "src/database/seed.ts",
+        "passed": true
+      },
+      {
+        "test": "Module src/modules/auth/oauth-service.ts exists",
+        "path": "src/modules/auth/oauth-service.ts",
+        "passed": true
+      },
+      {
+        "test": "Module src/modules/products/product-service.ts exists",
+        "path": "src/modules/products/product-service.ts",
+        "passed": true
+      },
+      {
+        "test": "Module src/modules/webhooks/webhook-service.ts exists",
+        "path": "src/modules/webhooks/webhook-service.ts",
+        "passed": true
+      },
+      {
+        "test": "Module src/modules/externalApis/api-a-service.ts exists",
+        "path": "src/modules/externalApis/api-a-service.ts",
+        "passed": true
+      },
+      {
+        "test": "Module src/cache/redis-client.ts exists",
+        "path": "src/cache/redis-client.ts",
+        "passed": true
+      },
+      {
+        "test": "Module src/cache/cache-keys.ts exists",
+        "path": "src/cache/cache-keys.ts",
+        "passed": true
+      },
+      {
+        "test": "Route src/routes/index.ts exists",
+        "path": "src/routes/index.ts",
+        "passed": true
+      },
+      {
+        "test": "Route src/routes/products.ts exists",
+        "path": "src/routes/products.ts",
+        "passed": true
+      },
+      {
+        "test": "Route src/routes/auth.ts exists",
+        "path": "src/routes/auth.ts",
+        "passed": true
+      },
+      {
+        "test": "Route src/routes/webhooks.ts exists",
+        "path": "src/routes/webhooks.ts",
+        "passed": true
+      },
+      {
+        "test": "Route src/routes/external-api.ts exists",
+        "path": "src/routes/external-api.ts",
+        "passed": true
+      },
+      {
+        "test": "Route src/routes/metrics.ts exists",
+        "path": "src/routes/metrics.ts",
+        "passed": true
+      },
+      {
+        "test": "Middleware src/middlewares/error-handler.ts exists",
+        "path": "src/middlewares/error-handler.ts",
+        "passed": true
+      },
+      {
+        "test": "Middleware src/middlewares/rate-limiter.ts exists",
+        "path": "src/middlewares/rate-limiter.ts",
+        "passed": true
+      },
+      {
+        "test": "Middleware src/middlewares/security.ts exists",
+        "path": "src/middlewares/security.ts",
+        "passed": true
+      },
+      {
+        "test": "Middleware src/middlewares/request-deduplication.ts exists",
+        "path": "src/middlewares/request-deduplication.ts",
+        "passed": true
+      },
+      {
+        "test": "Docker file Dockerfile exists",
+        "path": "Dockerfile",
+        "passed": true
+      },
+      {
+        "test": "Docker file docker-compose.yml exists",
+        "path": "docker-compose.yml",
+        "passed": true
+      },
+      {
+        "test": "Docker file .dockerignore exists",
+        "path": ".dockerignore",
+        "passed": true
+      }
+    ],
+    "dependencies": [
+      {
+        "dep": "express",
+        "type": "production",
+        "exists": true
+      },
+      {
+        "dep": "mysql2",
+        "type": "production",
+        "exists": true
+      },
+      {
+        "dep": "redis",
+        "type": "production",
+        "exists": true
+      },
+      {
+        "dep": "axios",
+        "type": "production",
+        "exists": true
+      },
+      {
+        "dep": "helmet",
+        "type": "production",
+        "exists": true
+      },
+      {
+        "dep": "cors",
+        "type": "production",
+        "exists": true
+      },
+      {
+        "dep": "compression",
+        "type": "production",
+        "exists": true
+      },
+      {
+        "dep": "winston",
+        "type": "production",
+        "exists": true
+      },
+      {
+        "dep": "dotenv",
+        "type": "production",
+        "exists": true
+      },
+      {
+        "dep": "typescript",
+        "type": "development",
+        "exists": true
+      },
+      {
+        "dep": "ts-node",
+        "type": "development",
+        "exists": true
+      },
+      {
+        "dep": "@types/express",
+        "type": "development",
+        "exists": true
+      },
+      {
+        "dep": "@types/node",
+        "type": "development",
+        "exists": true
+      }
+    ],
+    "configuration": []
+  },
+  "summary": {
+    "totalFiles": 44,
+    "passedFiles": 44,
+    "totalDependencies": 13,
+    "foundDependencies": 13,
+    "isValid": true
+  }
+}

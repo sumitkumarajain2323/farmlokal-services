@@ -1,0 +1,177 @@
+import axios, { AxiosResponse } from 'axios';
+import { redisCache } from '@/cache/redis-client';
+import { CacheKeys, CacheTTL } from '@/cache/cache-keys';
+import { logger } from '@/utils/logger';
+import { ExternalAPIError } from '@/utils/errors';
+import config from '@/config';
+
+export interface OAuthToken {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  scope?: string;
+  created_at: number;
+}
+
+export interface OAuthTokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  scope?: string;
+}
+
+export class OAuthService {
+  private readonly clientId: string;
+  private readonly clientSecret: string;
+  private readonly tokenUrl: string;
+  private readonly scope: string;
+
+  constructor() {
+    this.clientId = config.oauth.clientId;
+    this.clientSecret = config.oauth.clientSecret;
+    this.tokenUrl = config.oauth.tokenUrl;
+    this.scope = config.oauth.scope;
+  }
+
+  async getAccessToken(): Promise<string> {
+    try {
+      // Try to get token from cache first
+      const cachedToken = await this.getCachedToken();
+      if (cachedToken && this.isTokenValid(cachedToken)) {
+        logger.debug('Using cached OAuth token');
+        return cachedToken.access_token;
+      }
+
+      // Use distributed lock to prevent multiple concurrent token refreshes
+      const lockAcquired = await this.acquireLock();
+      if (!lockAcquired) {
+        // Another process is refreshing the token, wait and try cache again
+        await this.waitForLockRelease();
+        const newCachedToken = await this.getCachedToken();
+        if (newCachedToken && this.isTokenValid(newCachedToken)) {
+          return newCachedToken.access_token;
+        }
+      }
+
+      try {
+        // Fetch new token from OAuth provider
+        const newToken = await this.fetchTokenFromProvider();
+        
+        // Cache the new token
+        await this.cacheToken(newToken);
+        
+        logger.info('OAuth token refreshed successfully');
+        return newToken.access_token;
+      } finally {
+        // Always release the lock
+        await this.releaseLock();
+      }
+    } catch (error) {
+      logger.error('Failed to get OAuth access token:', error);
+      throw new ExternalAPIError('Failed to obtain OAuth access token');
+    }
+  }
+
+  private async getCachedToken(): Promise<OAuthToken | null> {
+    return await redisCache.get<OAuthToken>(CacheKeys.OAUTH_TOKEN);
+  }
+
+  private isTokenValid(token: OAuthToken): boolean {
+    const now = Math.floor(Date.now() / 1000);
+    const expiresAt = token.created_at + token.expires_in;
+    // Consider token expired 5 minutes before actual expiry for safety
+    return expiresAt > (now + 300);
+  }
+
+  private async acquireLock(): Promise<boolean> {
+    const lockValue = `${Date.now()}-${Math.random()}`;
+    return await redisCache.setNX(CacheKeys.OAUTH_LOCK, lockValue, CacheTTL.OAUTH_LOCK);
+  }
+
+  private async releaseLock(): Promise<void> {
+    await redisCache.del(CacheKeys.OAUTH_LOCK);
+  }
+
+  private async waitForLockRelease(): Promise<void> {
+    let attempts = 0;
+    const maxAttempts = 10;
+    
+    while (attempts < maxAttempts) {
+      const lockExists = await redisCache.exists(CacheKeys.OAUTH_LOCK);
+      if (!lockExists) {
+        break;
+      }
+      
+      // Wait 100ms before checking again
+      await new Promise(resolve => setTimeout(resolve, 100));
+      attempts++;
+    }
+  }
+
+  private async fetchTokenFromProvider(): Promise<OAuthToken> {
+    try {
+      const response: AxiosResponse<OAuthTokenResponse> = await axios.post(
+        this.tokenUrl,
+        new URLSearchParams({
+          grant_type: 'client_credentials',
+          client_id: this.clientId,
+          client_secret: this.clientSecret,
+          scope: this.scope,
+        }),
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
+          },
+          timeout: 10000, // 10 seconds timeout
+        }
+      );
+
+      const tokenData = response.data;
+      
+      return {
+        access_token: tokenData.access_token,
+        token_type: tokenData.token_type,
+        expires_in: tokenData.expires_in,
+        scope: tokenData.scope,
+        created_at: Math.floor(Date.now() / 1000),
+      };
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status || 500;
+        const message = error.response?.data?.error_description || 
+                       error.response?.data?.error || 
+                       'OAuth token request failed';
+        throw new ExternalAPIError(`OAuth error: ${message}`, status);
+      }
+      throw error;
+    }
+  }
+
+  private async cacheToken(token: OAuthToken): Promise<void> {
+    // Cache for slightly less than the actual expiry time
+    const cacheTTL = Math.max(token.expires_in - 300, 60); // At least 1 minute
+    await redisCache.set(CacheKeys.OAUTH_TOKEN, token, cacheTTL);
+  }
+
+  async invalidateToken(): Promise<void> {
+    await redisCache.del(CacheKeys.OAUTH_TOKEN);
+    logger.info('OAuth token invalidated');
+  }
+
+  async getTokenInfo(): Promise<{ isValid: boolean; expiresIn?: number }> {
+    const token = await this.getCachedToken();
+    
+    if (!token) {
+      return { isValid: false };
+    }
+
+    const isValid = this.isTokenValid(token);
+    const now = Math.floor(Date.now() / 1000);
+    const expiresIn = isValid ? (token.created_at + token.expires_in - now) : 0;
+
+    return { isValid, expiresIn };
+  }
+}
+
+export const oauthService = new OAuthService();

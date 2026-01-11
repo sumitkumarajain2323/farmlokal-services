@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-01-11T10:01:06.870Z",
+  "type": "mock_test",
+  "summary": {
+    "totalTests": 32,
+    "passedTests": 30,
+    "failedTests": 2,
+    "successRate": "93.8%"
+  },
+  "status": "MOSTLY_PASSED"
+}
