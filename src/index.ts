@@ -1,3 +1,6 @@
+// Setup module aliases for production
+import 'module-alias/register';
+
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
