@@ -39,6 +39,9 @@ RUN npm ci --only=production && npm cache clean --force
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
 
+# Copy tsconfig.json for tsconfig-paths runtime resolution
+COPY tsconfig.json ./
+
 # Create logs directory
 RUN mkdir -p logs && chown -R farmlokal:nodejs logs
 
