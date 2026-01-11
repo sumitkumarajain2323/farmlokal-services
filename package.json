@@ -4,7 +4,7 @@
   "description": "High-performance hyperlocal marketplace backend",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && tsc-alias",
     "start": "node dist/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "migrate": "ts-node src/database/migrate.ts",
@@ -29,7 +29,7 @@
     "dotenv": "^16.3.1",
     "uuid": "^9.0.1",
     "node-cron": "^3.0.3",
-    "module-alias": "^2.2.3"
+    "tsc-alias": "^1.8.8"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
@@ -49,9 +49,6 @@
     "@typescript-eslint/parser": "^6.13.1",
     "eslint": "^8.54.0",
     "prettier": "^3.1.0"
-  },
-  "_moduleAliases": {
-    "@": "dist"
   },
   "engines": {
     "node": ">=18.0.0"
